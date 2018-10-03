@@ -307,16 +307,16 @@ namespace AppSettings
         SunElevation.Initialize(tweakBar, "SunElevation", "Sun Light", "Sun Elevation", "Elevation of sun from ground. 0 degrees is aligned on the horizon while 90 degrees is directly overhead", 0.0000f, 0.0000f, 90.0000f, 0.1000f, ConversionMode::None, 1.0000f);
         Settings.AddSetting(&SunElevation);
 
-        SkyMode.Initialize(tweakBar, "SkyMode", "Sky", "Sky Mode", "Controls the sky used for GI baking and background rendering", SkyModes::Procedural, 6, SkyModesLabels);
+        SkyMode.Initialize(tweakBar, "SkyMode", "Sky", "Sky Mode", "Controls the sky used for GI baking and background rendering", SkyModes::Simple, 6, SkyModesLabels);
         Settings.AddSetting(&SkyMode);
 
-        SkyColor.Initialize(tweakBar, "SkyColor", "Sky", "Sky Color", "The color of the simple sky", Float3(1400.0000f, 3500.0000f, 7000.0000f), true, 0.0000f, 1000000.0000f, 0.1000f, ColorUnit::Luminance);
+        SkyColor.Initialize(tweakBar, "SkyColor", "Sky", "Sky Color", "The color of the simple sky", Float3(7000.0000f, 7000.0000f, 7000.0000f), true, 0.0000f, 1000000.0000f, 0.1000f, ColorUnit::Luminance);
         Settings.AddSetting(&SkyColor);
 
         Turbidity.Initialize(tweakBar, "Turbidity", "Sky", "Turbidity", "", 2.0000f, 1.0000f, 10.0000f, 0.0100f, ConversionMode::None, 1.0000f);
         Settings.AddSetting(&Turbidity);
 
-        GroundAlbedo.Initialize(tweakBar, "GroundAlbedo", "Sky", "Ground Albedo", "", Float3(0.5000f, 0.5000f, 0.5000f), false, -340282300000000000000000000000000000000.0000f, 340282300000000000000000000000000000000.0000f, 0.0100f, ColorUnit::None);
+        GroundAlbedo.Initialize(tweakBar, "GroundAlbedo", "Sky", "Ground Albedo", "", Float3(7000.0000f, 7000.0000f, 7000.0000f), false, -340282300000000000000000000000000000000.0000f, 340282300000000000000000000000000000000.0000f, 0.0100f, ColorUnit::None);
         Settings.AddSetting(&GroundAlbedo);
 
         EnableAreaLight.Initialize(tweakBar, "EnableAreaLight", "Area Light", "Enable Area Light", "Enables the area light during baking and ground truth rendering", false);
@@ -371,7 +371,7 @@ namespace AppSettings
         ManualExposure.Initialize(tweakBar, "ManualExposure", "Camera Controls", "Manual Exposure", "Manual exposure value when auto-exposure is disabled", -16.0000f, -32.0000f, 32.0000f, 0.0100f, ConversionMode::None, 1.0000f);
         Settings.AddSetting(&ManualExposure);
 
-        ApertureSize.Initialize(tweakBar, "ApertureSize", "Camera Controls", "Aperture", "", FStops::FStop16Point0, 23, FStopsLabels);
+        ApertureSize.Initialize(tweakBar, "ApertureSize", "Camera Controls", "Aperture", "", FStops::FStop4Point5, 23, FStopsLabels);
         Settings.AddSetting(&ApertureSize);
 
         ISORating.Initialize(tweakBar, "ISORating", "Camera Controls", "ISO Rating", "", ISORatings::ISO100, 4, ISORatingsLabels);
@@ -477,7 +477,7 @@ namespace AppSettings
         LightMapResolution.Initialize(tweakBar, "LightMapResolution", "Baking", "Light Map Resolution", "The texture resolution of the light map", 256, 64, 4096);
         Settings.AddSetting(&LightMapResolution);
 
-        NumBakeSamples.Initialize(tweakBar, "NumBakeSamples", "Baking", "Sqrt Num Samples", "The square root of the number of sample rays to use for baking GI", 25, 1, 100);
+        NumBakeSamples.Initialize(tweakBar, "NumBakeSamples", "Baking", "Sqrt Num Samples", "The square root of the number of sample rays to use for baking GI", 100, 1, 100);
         Settings.AddSetting(&NumBakeSamples);
 
         BakeSampleMode.Initialize(tweakBar, "BakeSampleMode", "Baking", "Sample Mode", "", SampleModes::CMJ, 5, SampleModesLabels);
@@ -495,7 +495,7 @@ namespace AppSettings
         BakeMode.Initialize(tweakBar, "BakeMode", "Baking", "Bake Mode", "", BakeModes::SG9, 10, BakeModesLabels);
         Settings.AddSetting(&BakeMode);
 
-        SolveMode.Initialize(tweakBar, "SolveMode", "Baking", "Solve Mode", "", SolveModes::NNLS, 5, SolveModesLabels);
+        SolveMode.Initialize(tweakBar, "SolveMode", "Baking", "Solve Mode", "", SolveModes::RunningAverage, 5, SolveModesLabels);
         Settings.AddSetting(&SolveMode);
 
         CurrentScene.Initialize(tweakBar, "CurrentScene", "Scene", "Current Scene", "", Scenes::Box, 3, ScenesLabels);
@@ -519,10 +519,10 @@ namespace AppSettings
         EnableIndirectSpecular.Initialize(tweakBar, "EnableIndirectSpecular", "Scene", "Enable Indirect Specular", "Enables indirect specular lighting", true);
         Settings.AddSetting(&EnableIndirectSpecular);
 
-        EnableAlbedoMaps.Initialize(tweakBar, "EnableAlbedoMaps", "Scene", "Enable Albedo Maps", "Enables albedo maps", true);
+        EnableAlbedoMaps.Initialize(tweakBar, "EnableAlbedoMaps", "Scene", "Enable Albedo Maps", "Enables albedo maps", false);
         Settings.AddSetting(&EnableAlbedoMaps);
 
-        EnableNormalMaps.Initialize(tweakBar, "EnableNormalMaps", "Scene", "Enable Normal Maps", "Enables normal maps", true);
+        EnableNormalMaps.Initialize(tweakBar, "EnableNormalMaps", "Scene", "Enable Normal Maps", "Enables normal maps", false);
         Settings.AddSetting(&EnableNormalMaps);
 
         NormalMapIntensity.Initialize(tweakBar, "NormalMapIntensity", "Scene", "Normal Map Intensity", "Intensity of the normal map", 0.5000f, 0.0000f, 1.0000f, 0.0100f, ConversionMode::None, 1.0000f);
@@ -570,7 +570,7 @@ namespace AppSettings
         ShowBakeDataVisualizer.Initialize(tweakBar, "ShowBakeDataVisualizer", "Debug", "Show Bake Data Visualizer", "", false);
         Settings.AddSetting(&ShowBakeDataVisualizer);
 
-        ViewIndirectSpecular.Initialize(tweakBar, "ViewIndirectSpecular", "Debug", "View Indirect Specular", "", false);
+        ViewIndirectSpecular.Initialize(tweakBar, "ViewIndirectSpecular", "Debug", "View Indirect Specular", "", true);
         Settings.AddSetting(&ViewIndirectSpecular);
 
         SaveLightSettings.Initialize(tweakBar, "SaveLightSettings", "Debug", "Save Light Settings", "Saves the lighting settings to a file");

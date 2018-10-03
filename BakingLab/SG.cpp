@@ -236,6 +236,7 @@ static void SolveProjection(SGSolveParam& params)
 // on was provided by Thomas Roughton in the following article: http://torust.me/rendering/irradiance-caching/spherical-gaussians/2018/09/21/spherical-gaussians.html
 void SGRunningAverage(const Float3& dir, const Float3& color, SG* outSGs, uint64 numSGs, float sampleIdx, float* lobeWeights, bool nonNegative)
 {
+
 	float sampleWeightScale = 1.0f / (sampleIdx + 1);
 
     float sampleLobeWeights[AppSettings::MaxSGCount] = { };
@@ -261,10 +262,20 @@ void SGRunningAverage(const Float3& dir, const Float3& color, SG* outSGs, uint64
 		lobeWeights[lobeIdx] += (sphericalIntegralGuess - lobeWeights[lobeIdx]) * sampleWeightScale;
 
 		// Clamp the spherical integral estimate to within a reasonable factor of the true value.
-		float sphericalIntegral = std::max(lobeWeights[lobeIdx], outSGs[lobeIdx].BasisSqIntegralOverDomain * 0.75f);
+		// Could maybe use the per-iteration estimate rather than the MC estimate?
+		float sphericalIntegral = std::max(lobeWeights[lobeIdx], outSGs[lobeIdx].BasisSqIntegralOverDomain * 0.5f);
 
 		Float3 otherLobesContribution = currentEstimate - outSGs[lobeIdx].Amplitude * weight;
 		Float3 newValue = (color - otherLobesContribution) * (weight / sphericalIntegral);
+
+	/*	Float3 result = outSGs[lobeIdx].Amplitude + (newValue - outSGs[lobeIdx].Amplitude) * sampleWeightScale;
+		Float3 deltaScale = Float3(fabs(result.x / outSGs[lobeIdx].Amplitude.x), fabs(result.y / outSGs[lobeIdx].Amplitude.y), fabs(result.x / outSGs[lobeIdx].Amplitude.x));
+		if (sampleIdx > 1000 &&
+		   ((deltaScale.x > 3.f) || (deltaScale.x < 0.33) ||
+			(deltaScale.y > 3.f) || (deltaScale.y < 0.33) ||
+			(deltaScale.z > 3.f) || (deltaScale.z < 0.33))) {
+			printf("New value is %.3f, %.3f, %.3f, current amplitude is %.3f, %.3f, %.3f\n", result.x, result.y, result.z, outSGs[lobeIdx].Amplitude.x, outSGs[lobeIdx].Amplitude.y, outSGs[lobeIdx].Amplitude.z);
+		}*/
 
         outSGs[lobeIdx].Amplitude += (newValue - outSGs[lobeIdx].Amplitude) * sampleWeightScale;
 
@@ -286,7 +297,7 @@ static void SolveRunningAverage(SGSolveParam& params, bool nonNegative)
 
     // Project color samples onto the SGs
     for(uint32 i = 0; i < params.NumSamples; ++i)
-        SGRunningAverage(params.XSamples[i], params.YSamples[i], params.OutSGs, params.NumSGs, (float)(i + 1), lobeWeights, nonNegative);
+        SGRunningAverage(params.XSamples[i], params.YSamples[i], params.OutSGs, params.NumSGs, (float)i, lobeWeights, nonNegative);
 }
 
 // Solve the set of spherical gaussians based on input set of data

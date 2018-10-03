@@ -847,7 +847,7 @@ void BakingLab::RenderHUD(const Timer& timer, float groundTruthProgress, float b
 
         transform._41 = 35.0f;
         transform._42 = deviceManager.BackBufferHeight() - 60.0f;
-        spriteRenderer.RenderText(font, progressText.c_str(), transform);
+        spriteRenderer.RenderText(font, progressText.c_str(), transform, Float4(0, 0, 0, 1));
     }
 
     if(AppSettings::EnableLuminancePicker && mouseState.IsOverWindow)
