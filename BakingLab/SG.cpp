@@ -148,45 +148,6 @@ static void SolveNNLS(SGSolveParam& params)
     }
 }
 
-// Solve for SG's using singular value decomposition
-static void SolveSVD(SGSolveParam& params)
-{
-	// -- Linearly solve for the rgb channels one at a time
-	Eigen::MatrixXf Ar, Ag, Ab;
-
-	Ar.resize(params.NumSamples, params.NumSGs);
-	Ag.resize(params.NumSamples, params.NumSGs);
-	Ab.resize(params.NumSamples, params.NumSGs);
-	Eigen::VectorXf br(params.NumSamples);
-	Eigen::VectorXf bg(params.NumSamples);
-	Eigen::VectorXf bb(params.NumSamples);
-	for(uint32 i = 0; i < params.NumSamples; ++i)
-	{
-		// compute difference squared from actual observed data
-		for(uint32 j = 0; j < params.NumSGs; ++j)
-		{
-			float exponent = std::exp((Float3::Dot(params.XSamples[i], params.OutSGs[j].Axis) - 1.0f) *
-				                      params.OutSGs[j].Sharpness);
-			Ar(i, j) = exponent;
-			Ag(i, j) = exponent;
-			Ab(i, j) = exponent;
-		}
-		br(i) = params.YSamples[i].x;
-		bg(i) = params.YSamples[i].y;
-		bb(i) = params.YSamples[i].z;
-	}
-
-	Eigen::VectorXf rchan = Ar.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(br);
-	Eigen::VectorXf gchan = Ag.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(bg);
-	Eigen::VectorXf bchan = Ab.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(bb);
-
-	for(uint32 j = 0; j < params.NumSGs; ++j) {
-		params.OutSGs[j].Amplitude.x = rchan[j];
-		params.OutSGs[j].Amplitude.y = gchan[j];
-		params.OutSGs[j].Amplitude.z = bchan[j];
-	}
-}
-
 // Project sample onto SGs
 void ProjectOntoSGs(const Float3& dir, const Float3& color, SG* outSGs, uint64 numSGs)
 {
@@ -236,13 +197,13 @@ void SGRunningAverage(const Float3& dir, const Float3& color, SG* outSGs, uint64
 	float sampleWeightScale = 1.0f / (sampleIdx + 1);
 
     float sampleLobeWeights[AppSettings::MaxSGCount] = { };
-    Float3 currentEstimate;
+    Float3 delta = color;
 
     for(uint64 lobeIdx = 0; lobeIdx < numSGs; ++lobeIdx)
     {
         float dotProduct = Float3::Dot(outSGs[lobeIdx].Axis, dir);
         float weight = exp(outSGs[lobeIdx].Sharpness * (dotProduct - 1.0f));
-		currentEstimate += outSGs[lobeIdx].Amplitude * weight;
+		delta -= outSGs[lobeIdx].Amplitude * weight;
 
         sampleLobeWeights[lobeIdx] = weight;
     }
@@ -258,12 +219,10 @@ void SGRunningAverage(const Float3& dir, const Float3& color, SG* outSGs, uint64
 		lobeWeights[lobeIdx] += (sphericalIntegralGuess - lobeWeights[lobeIdx]) * sampleWeightScale;
 
 		// Clamp the spherical integral estimate to at least the true value to reduce variance.
-		float sphericalIntegral = std::max(lobeWeights[lobeIdx], outSGs[lobeIdx].BasisSqIntegralOverDomain);
+		float sphericalIntegral = sampleWeightScale + (1 - sampleWeightScale) * lobeWeights[lobeIdx];
 
-		Float3 otherLobesContribution = currentEstimate - outSGs[lobeIdx].Amplitude * weight;
-		Float3 newValue = (color - otherLobesContribution) * (weight / sphericalIntegral);
-
-        outSGs[lobeIdx].Amplitude += (newValue - outSGs[lobeIdx].Amplitude) * sampleWeightScale;
+		float deltaScale = weight * sampleWeightScale / sphericalIntegral;
+        outSGs[lobeIdx].Amplitude += delta * deltaScale;
 
         if(nonNegative)
         {
@@ -271,6 +230,8 @@ void SGRunningAverage(const Float3& dir, const Float3& color, SG* outSGs, uint64
             outSGs[lobeIdx].Amplitude.y = Max(outSGs[lobeIdx].Amplitude.y, 0.0f);
             outSGs[lobeIdx].Amplitude.z = Max(outSGs[lobeIdx].Amplitude.z, 0.0f);
         } 
+
+		delta *= 1.f - deltaScale * weight;
     }
 }
 
@@ -284,6 +245,94 @@ static void SolveRunningAverage(SGSolveParam& params, bool nonNegative)
     // Project color samples onto the SGs
     for(uint32 i = 0; i < params.NumSamples; ++i)
         SGRunningAverage(params.XSamples[i], params.YSamples[i], params.OutSGs, params.NumSGs, (float)i, lobeWeights, nonNegative);
+}
+
+// Solve for SG's using singular value decomposition
+static void SolveSVD(SGSolveParam& params)
+{
+	// -- Linearly solve for the rgb channels one at a time
+	Eigen::MatrixXf Ar, Ag, Ab;
+
+	Ar.resize(params.NumSamples, params.NumSGs);
+	Ag.resize(params.NumSamples, params.NumSGs);
+	Ab.resize(params.NumSamples, params.NumSGs);
+	Eigen::VectorXf br(params.NumSamples);
+	Eigen::VectorXf bg(params.NumSamples);
+	Eigen::VectorXf bb(params.NumSamples);
+	for (uint32 i = 0; i < params.NumSamples; ++i)
+	{
+		// compute difference squared from actual observed data
+		for (uint32 j = 0; j < params.NumSGs; ++j)
+		{
+			float exponent = std::exp((Float3::Dot(params.XSamples[i], params.OutSGs[j].Axis) - 1.0f) *
+				params.OutSGs[j].Sharpness);
+			Ar(i, j) = exponent;
+			Ag(i, j) = exponent;
+			Ab(i, j) = exponent;
+		}
+		br(i) = params.YSamples[i].x;
+		bg(i) = params.YSamples[i].y;
+		bb(i) = params.YSamples[i].z;
+	}
+
+	Eigen::VectorXf rchan = Ar.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(br);
+	Eigen::VectorXf gchan = Ag.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(bg);
+	Eigen::VectorXf bchan = Ab.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(bb);
+
+	for (uint32 j = 0; j < params.NumSGs; ++j) {
+		params.OutSGs[j].Amplitude.x = rchan[j];
+		params.OutSGs[j].Amplitude.y = gchan[j];
+		params.OutSGs[j].Amplitude.z = bchan[j];
+	}
+
+
+	SG *runningAverageSGs = new SG[params.NumSGs];
+
+	for (uint32 j = 0; j < params.NumSGs; ++j) {
+		runningAverageSGs[j] = params.OutSGs[j];
+		runningAverageSGs[j].Amplitude = Float3(0);
+	}
+
+	SGSolveParam raParams = params;
+	raParams.OutSGs = runningAverageSGs;
+	SolveRunningAverage(raParams, false);
+
+	Float3 leastSquaresError = Float3(0);
+	Float3 runningAverageError = Float3(0);
+
+	for (uint32 i = 0; i < params.NumSamples; ++i) {
+
+		Float3 leastSquaresEstimate = Float3(0);
+		Float3 runningAverageEstimate = Float3(0);
+
+		// compute difference squared from actual observed data
+		for (uint32 j = 0; j < params.NumSGs; ++j)
+		{
+			float exponent = std::exp((Float3::Dot(params.XSamples[i], params.OutSGs[j].Axis) - 1.0f) *
+				params.OutSGs[j].Sharpness);
+			leastSquaresEstimate += exponent * params.OutSGs[j].Amplitude;
+
+			runningAverageEstimate += exponent * runningAverageSGs[j].Amplitude;
+		}
+
+		Float3 leastSquaresDelta = params.YSamples[i] - leastSquaresEstimate;
+		Float3 runningAverageDelta = params.YSamples[i] - runningAverageEstimate;
+
+		leastSquaresError += (leastSquaresDelta * leastSquaresDelta - leastSquaresError) / float(i + 1);
+		runningAverageError += (runningAverageDelta * runningAverageDelta - runningAverageError) / float(i + 1);
+	}
+
+	delete[] runningAverageSGs;
+
+	Float3 relativeError = runningAverageError / leastSquaresError;
+
+	for (uint32 j = 0; j < params.NumSGs; ++j) {
+		params.OutSGs[j].Amplitude = relativeError - Float3(1.0);
+	}
+
+	if (relativeError.x > 1.05f || relativeError.y > 1.05f || relativeError.z > 1.05f) {
+		printf("Relative error: %f, %f, %f\n", relativeError.x, relativeError.y, relativeError.z);
+	}
 }
 
 // Solve the set of spherical gaussians based on input set of data
